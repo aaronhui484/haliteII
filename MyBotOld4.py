@@ -1,3 +1,4 @@
+
 import hlt
 from hlt import helper
 import logging
@@ -77,8 +78,7 @@ while True:
         ship_dists[s] = sorted(ship_dists[s], key = ship_dists[s].get, reverse = True)
 
     assigned_ships = []
-    
-    #Ship Commands
+
     for s in ship_dists:
         targs = ship_dists[s]
         first_targ = None

@@ -18,6 +18,15 @@ def enemy_ships(map):
 			ships = ships + player.all_ships()
 	return ships
 
+def enemy_undocked_ships(map):
+    return [ship for ship in enemy_ships(map) if ship.docking_status == ship.DockingStatus.UNDOCKED]
+
+def enemy_docked_ships(map):
+    return [ship for ship in enemy_ships(map) if ship.docking_status != ship.DockingStatus.UNDOCKED]
+
+def my_planets(map):
+    return [planet for planet in map.all_planets() if planet.owner == map.get_me()]
+
 def unfilled_planets(map):
 	return [planet for planet in map.all_planets() if planet.owner == map.get_me() and not planet.is_full()]
 
@@ -27,8 +36,8 @@ def unowned_planets(map):
 def enemy_planets(map):
 	return [planet for planet in map.all_planets() if planet.owner != map.get_me() and planet.is_owned()]
 
-def dist_to_turns(dist, speed = constants.MAX_SPEED):
-	return math.ceil(dist/speed)
+def dist_to_turns(dist, speed = constants.MAX_SPEED, round = True):
+	return math.ceil(dist/speed) if round else dist/speed
 
 def nearby_entities_by_distance(entity, entity_list):
 	result = {}
@@ -41,7 +50,10 @@ def nearby_entities_by_distance(entity, entity_list):
 def num_docking_spots(planet):
 	return planet.num_docking_spots - len(planet.all_docked_ships())
 
-def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_corrections=90, angular_step=1,
+def is_enemy(map, target):
+    return not (target.owner == map.get_me() or target.owner == None)
+
+def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_corrections=60, angular_step=1,
              ignore_ships=False, ignore_planets=False):
     """
     Move a ship to a specific target position (Entity). It is recommended to place the position
@@ -75,7 +87,7 @@ def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_correction
         new_target_dx = math.cos(math.radians(angle + angular_step)) * distance
         new_target_dy = math.sin(math.radians(angle + angular_step)) * distance
         new_target = Position(ship.x + new_target_dx, ship.y + new_target_dy)
-        return ship.navigate(new_target, game_map, speed, True, max_corrections - 1, angular_step)
+        return navigate(ship, new_target, game_map, speed, True, max_corrections - 1, -(angular_step+3))
     speed = speed if (distance >= speed) else distance
     return ship.thrust(speed, angle)
 
@@ -101,24 +113,8 @@ def obstacles_between(ship, target, map, ignore=()):
             obstacles.append(foreign_entity)
     return obstacles
 
-#TODO
-class ship_info:
-	def __init__(self,ship,map):
-		all_entities = sorted(map.nearby_entities_by_distance(ship))
-		
-		self.ally_planet = []
-		self.enemy_planet =[]
-		self.ally_ships = []
-		self.enemy_ships = []
-
-		for e in all_entities:
-			if type(e) == planet:
-				if e.owner == map.get_me():
-					self.ally_planet = self.ally_planet + e
-				else:
-					self.enemy_planet = self.enemy_planet + e
-			else:
-				if e.owner == map.get_me():
-					self.ally_ships = self.ally_ships + e
-				else:
-					self.enemy_ships = self.enemy_ships + e
+def point_line_dist(p, seg):
+    line_dist = (seg.y2 - seg.y1) * p.x - (seg.x2 - seg.x1)*p.y + seg.x2*seg.y1 - seg.y2*seg.x1
+    e1_dist = sqrt((p.x-seg.x1)**2 + (p.y - seg.y1)**2)
+    e2_dist = sqrt((p.x-seg.x2)**2 + (p.y - seg.y2)**2)
+    return min(line_dist, e1_dist, e2_dist)

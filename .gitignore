@@ -3,6 +3,7 @@ run_game.bat
 run_game.sh
 halite.exe
 *.hlt
+hlt_client
 
 #################
 ## Eclipse

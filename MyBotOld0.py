@@ -19,7 +19,7 @@ import time
 
 # GAME START
 # Here we define the bot's name as Settler and initialize the game, including communication with the Halite engine.
-game = hlt.Game("Bot2")
+game = hlt.Game("Old3")
 # Then we print our start message to the logs
 logging.info("Starting my Settler bot!")
 
