@@ -1,5 +1,6 @@
 *.log
-run_game.bat
+*.
+*.zip
 run_game.sh
 halite.exe
 *.hlt

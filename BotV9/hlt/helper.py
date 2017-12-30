@@ -1,6 +1,8 @@
 from . import collision, entity, game_map, constants
 from hlt.entity import Position, Ship
+from .geom import Point, Seg, min_dist, ps_dist
 import math
+import logging
 
 def my_ships(map):
 	return map.get_me().all_ships()
@@ -53,8 +55,8 @@ def num_docking_spots(planet):
 def is_enemy(map, target):
     return not (target.owner == map.get_me() or target.owner == None)
 
-def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_corrections=60, angular_step=1,
-             ignore_ships=False, ignore_planets=False):
+def navigate(ship, target, map, speed, move_table, 
+    obs=None, max_corrections=180, angular_step=1):
     """
     Move a ship to a specific target position (Entity). It is recommended to place the position
     itself here, else navigate will crash into the target. If avoid_obstacles is set to True (default)
@@ -75,43 +77,94 @@ def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_correction
     :rtype: str
     """
     # Assumes a position, not planet (as it would go to the center of the planet otherwise)
-    if max_corrections <= 0:
-        return None
     distance = ship.calculate_distance_between(target)
-    angle = ship.calculate_angle_between(target)
-    ignore = () if not (ignore_ships or ignore_planets) \
-        else Ship if (ignore_ships and not ignore_planets) \
-        else Planet if (ignore_planets and not ignore_ships) \
-        else Entity
-    if avoid_obstacles and obstacles_between(ship, target, game_map, ignore):
+    angle = round(ship.calculate_angle_between(target))
+
+    if obs == None:
+        obs = [e for e in map.all_planets() + my_docked_ships(map) if e != target and e != ship 
+                and ship.calculate_distance_between(e)-ship.radius-e.radius <= distance]
+
+    move_table_upd = move_table
+    for e in move_table:
+        if ship.calculate_distance_between(e) <= constants.MAX_SPEED*2 + ship.radius + e.radius:
+            move_table_upd[e] = move_table[e]
+
+    move_table = move_table_upd
+
+    if max_corrections <= 0:
+        return None, None
+
+    if obstacles_between(ship, target, map, speed, obs, move_table):
         new_target_dx = math.cos(math.radians(angle + angular_step)) * distance
         new_target_dy = math.sin(math.radians(angle + angular_step)) * distance
         new_target = Position(ship.x + new_target_dx, ship.y + new_target_dy)
-        return navigate(ship, new_target, game_map, speed, True, max_corrections - 1, -(angular_step+3))
-    speed = speed if (distance >= speed) else distance
-    return ship.thrust(speed, angle)
+        return navigate(ship, new_target, map, speed, move_table, obs, 
+            max_corrections - 1, -(angular_step+1) if angular_step > 0 else -(angular_step-1))
 
-def obstacles_between(ship, target, map, ignore=()):
-    """
-    Check whether there is a straight-line path to the given point, without planetary obstacles in between.
+    speed = speed if (distance >= speed) else int(distance)
+    pos = Point(ship.x, ship.y)
+    d = Point(speed*math.cos(math.radians(angle)),speed*math.sin(math.radians(angle)))
+    move = Seg(pos, pos+d)
 
-    :param entity.Ship ship: Source entity
-    :param entity.Entity target: Target entity
-    :param entity.Entity ignore: Which entity type to ignore
-    :return: The list of obstacles between the ship and target
-    :rtype: list[entity.Entity]
-    """
-    obstacles = []
-    entities = ([] if issubclass(entity.Planet, ignore) else map.all_planets()) \
-        + ([] if issubclass(entity.Ship, ignore) else enemy_ships(map)) \
-        + (my_undocked_ships(map) if len(my_undocked_ships(map)) < 50 else []) \
-        + (my_docked_ships(map))
-    for foreign_entity in entities:
-        if foreign_entity == ship or foreign_entity == target:
+    return ship.thrust(speed, angle), move
+
+# def obstacles_between(ship, target, map, ignore=()):
+#     """
+#     Check whether there is a straight-line path to the given point, without planetary obstacles in between.
+
+#     :param entity.Ship ship: Source entity
+#     :param entity.Entity target: Target entity
+#     :param entity.Entity ignore: Which entity type to ignore
+#     :return: The list of obstacles between the ship and target
+#     :rtype: list[entity.Entity]
+#     """
+#     obstacles = []
+
+#     entities = ([] if issubclass(entity.Planet, ignore) else map.all_planets()) \
+#         + ([] if issubclass(entity.Ship, ignore) else enemy_ships(map)) \
+#         + (my_undocked_ships(map) if len(my_undocked_ships(map)) < 50 else []) \
+#         + (my_docked_ships(map))
+
+#     for foreign_entity in entities:
+#         if foreign_entity == ship or foreign_entity == target:
+#             continue
+#         if collision.intersect_segment_circle(ship, target, foreign_entity, fudge=ship.radius + 0.1):
+#             obstacles.append(foreign_entity)
+#     return obstacles
+
+def obstacles_between(ship, target, map, speed, obs, move_table):
+    move = Seg(Point(ship.x,ship.y), Point(target.x,target.y))
+    logging.info("Angle: " + str(round(ship.calculate_angle_between(target))))
+    
+    for e in obs:
+        if e == ship or e == target:
             continue
-        if collision.intersect_segment_circle(ship, target, foreign_entity, fudge=ship.radius + 0.1):
-            obstacles.append(foreign_entity)
-    return obstacles
+        p = Point(e.x,e.y)
+        if ps_dist(p,move) <= ship.radius + e.radius:
+            logging.info("PS_Dist: " + str(ps_dist(p,move)-e.radius) + ", Collides with: " 
+                + str(e) + ", " + str(ps_dist(p,move)))
+            return True
+
+
+    distance = ship.calculate_distance_between(target)
+    speed = speed if (distance >= speed) else int(distance)
+    angle = round(ship.calculate_angle_between(target))
+    pos = Point(ship.x, ship.y)
+    d = Point(speed*math.cos(math.radians(angle)),speed*math.sin(math.radians(angle)))
+    move = Seg(pos, pos+d)
+
+    logging.info("Test Move: " + str(move))
+
+    for ship_oth, move_oth in move_table.items():
+        if ship_oth == ship:
+            continue
+        
+        if min_dist(move, move_oth) <= ship.radius + ship_oth.radius:
+            logging.info("Min_Dist: " + str(min_dist(move, move_oth)) + ", Collides with: " 
+                + str(ship_oth) + " With Seg " + str(move_oth))
+            return True
+
+    return False
 
 def point_line_dist(p, seg):
     line_dist = (seg.y2 - seg.y1) * p.x - (seg.x2 - seg.x1)*p.y + seg.x2*seg.y1 - seg.y2*seg.x1

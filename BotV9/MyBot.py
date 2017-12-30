@@ -3,9 +3,10 @@ from hlt import helper
 import logging
 import time
 import math
+from hlt.geom import Point, Seg
 
 # GAME START
-game = hlt.Game("PriorityBot")
+game = hlt.Game("Bot V9")
 turn = 0
 
 while True:
@@ -49,9 +50,9 @@ while True:
             #TEMP CODE TO PREVENT INSTAKILLS
             if type(e) == hlt.entity.Planet:
                 info[e] = helper.dist_to_turns(s.calculate_distance_between(s.closest_point_to(e)), round = False)
-                info[e] += 1
+                info[e] += 2
                 if e.owner != game_map.get_me():
-                    info[e] += 2
+                    info[e] += .5
                 #logging.info("PLANET: " + str(info[e]))
             elif type(e) == hlt.entity.Ship:
                 info[e] = helper.dist_to_turns(s.calculate_distance_between(e) - hlt.constants.WEAPON_RADIUS, round = False)
@@ -77,52 +78,70 @@ while True:
         ship_dists[s] = sorted(ship_dists[s], key = ship_dists[s].get, reverse = True)
 
     assigned_ships = []
+
+    if len(ship_dists) < 300:
+        move_table = {s:Seg(Point(s.x,s.y),Point(s.x,s.y)) for s in ship_dists}
+    else:
+        move_table = {}
     
     #Ship Commands
     for s in ship_dists:
+        logging.info("Routing " + str(s))
         targs = ship_dists[s]
         first_targ = None
         assigned = False
-        while len(targs) > 0:
+        nav_cmd = None
+        move = None
+
+        while len(targs) > 0 and assigned == False:
             targ = targs.pop()
             if first_targ == None and type(targ) == hlt.entity.Ship:
                 first_targ = targ
 
             if type(targ) == hlt.entity.Planet and planet_rem_dock_spot[targ] > 0:
                 if s.can_dock(targ):
-                    command_queue.append(s.dock(targ))
+                    logging.info("Dock at: " + str(targ))
+                    nav_cmd = s.dock(targ)
+                    move = Seg(Point(s.x,s.y), Point(s.x,s.y))
                     planet_rem_dock_spot[targ] -= 1
                     assigned = True
-                    break
                 else:
-                    navigate_command = helper.navigate(s,s.closest_point_to(targ),game_map,speed=int(hlt.constants.MAX_SPEED),ignore_ships=True)
+                    logging.info("Go To: " + str(targ))
+                    nav_cmd, move = helper.navigate(s,s.closest_point_to(targ),game_map,int(hlt.constants.MAX_SPEED), move_table)
                     assigned = True
-                    if navigate_command:
-                        command_queue.append(navigate_command)
+                    if nav_cmd:
                         planet_rem_dock_spot[targ] -= 1
-                    break
             elif type(targ) == hlt.entity.Ship:
                 if enemy_ship_assigned[targ] > 0 or helper.dist_to_turns(s.calculate_distance_between(targ)) < 2:
-                    navigate_command = helper.navigate(s,s.closest_point_to(targ),game_map,speed=int(hlt.constants.MAX_SPEED),ignore_ships=True)
+                    logging.info("Attack: " + str(targ))
+                    nav_cmd, move = helper.navigate(s,s.closest_point_to(targ),game_map,int(hlt.constants.MAX_SPEED), move_table)
                     assigned = True
-                    if navigate_command:
-                        command_queue.append(navigate_command)
+                    if nav_cmd:
                         enemy_ship_assigned[targ] -= 1
-                    break
+
+        if assigned and nav_cmd:
+            command_queue.append(nav_cmd)
+            move_table[s] = move
 
         if not assigned and first_targ != None:
-            navigate_command = helper.navigate(s,s.closest_point_to(first_targ),game_map,speed=int(hlt.constants.MAX_SPEED),ignore_ships=True)
-            if navigate_command:
-                command_queue.append(navigate_command)
+            nav_cmd, move = helper.navigate(s,s.closest_point_to(first_targ),game_map,int(hlt.constants.MAX_SPEED), move_table)
+            if nav_cmd:
+                command_queue.append(nav_cmd)
+                move_table[s] = move
 
+        logging.info("Make Move: " + str(move))
 
+        if nav_cmd == None:
+            logging.info("NULL NAV_CMD")
+
+        logging.info("END ROUTING FOR SHIP " + str(s.id))
 
     # Send our set of commands to the Halite engine for this turn
     game.send_command_queue(command_queue)
 
     end_time = time.process_time()
     elapsed_time = end_time - start_time
-    if elapsed_time >= 1:
+    if elapsed_time >= .5:
         logging.critical("Time Elapsed: " + str(end_time - start_time))
     else:
         logging.info("Time Elapsed: " + str(end_time - start_time))

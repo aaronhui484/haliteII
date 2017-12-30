@@ -32,6 +32,9 @@ class Seg:
 		self.p1 = p1
 		self.p2 = p2
 
+	def __str__(self):
+		return str(self.p1) + " to " + str(self.p2)
+
 	#Returns the displacement vector from p1 to p2
 	def d_vect(self):
 		return self.p2 - self.p1
