@@ -1,1 +1,1 @@
-python hlt_client\hlt_client\client.py gym -r "python BotV9/MyBot.py" -r "python BotV8/MyBot.py" -b "halite" -i 100 
+python hlt_client\hlt_client\client.py gym -r "python BotV10/MyBot.py" -r "python BotV9/MyBot.py" -r "python BotV9/MyBot.py" -r "python BotV9/MyBot.py" -b "halite" -i 100 
