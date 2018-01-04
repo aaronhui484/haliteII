@@ -1,10 +1,17 @@
 import math
 from . import constants
+import logging
 
 class Point:
 	def __init__(self, x, y):
 		self.x = x
 		self.y = y
+
+	@classmethod
+	def polar(cls, r, ang):
+		x = r*math.cos(math.radians(ang))
+		y = r*math.sin(math.radians(ang))
+		return cls(x,y)
 
 	def __add__(self,p2):
 		return Point(self.x + p2.x, self.y + p2.y)
@@ -13,9 +20,11 @@ class Point:
 		return Point(self.x - p2.x, self.y - p2.y)
 
 	def __str__(self):
-		return "(" + str(self.x) + "," + str(self.y) + ")"
+		return "({},{})".format(round(self.x,2), round(self.y,2))
 
 	def __eq__(self, other):
+		if other == None:
+			return False
 		return self.x == other.x and self.y == other.y
 
 	def __hash__(self):
@@ -47,7 +56,7 @@ class Seg:
 		return Point((1-t)*self.p1.x+t*self.p2.x, (1-t)*self.p1.y+t*self.p2.y)
 
 	def angle(self):
-		return (p2-p1).angle()
+		return (self.p2-self.p1).angle()
 
 #PointPoint Distance Squared
 def pp_dist2(p1,p2):
@@ -83,3 +92,17 @@ def min_dist(seg1,seg2):
 	delta = seg2.d_vect() - seg1.d_vect()
 	seg_eff = Seg(start, start + delta)
 	return ps_dist(Point(0,0), seg_eff)
+
+def cent_of_mass(pts):
+	p = None
+	for q in pts:
+		if p == None:
+			p = q
+		else:
+			p += q
+
+	if p == None:
+		return None
+	else:
+		return Point(p.x/len(pts), p.y/len(pts))
+
