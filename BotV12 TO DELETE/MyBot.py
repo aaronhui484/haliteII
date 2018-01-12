@@ -9,7 +9,7 @@ from hlt.constants import *
 from hlt.entity import Position
 
 # GAME START
-game = hlt.Game("Bot V11")
+game = hlt.Game("Bot V12")
 turn = 0
 
 while True:
@@ -46,7 +46,7 @@ while True:
 
     #OTHER INFO
     rem_dock = {p:p.rem_spots() for p in gmap.unowned_planets() + gmap.my_uplanets()}
-    en_ship_assigned = {s:math.ceil(s.hp/WEAPON_DAMAGE) for s in gmap.en_ships()}
+    en_ship_assigned = {s:[] for s in gmap.en_ships()}
 
     #MOVE LIST WITH PRIORITIES
     move_list = {}
@@ -60,13 +60,15 @@ while True:
                 d = helper.to_turns(s.dist_to(e) - WEAPON_RADIUS)
                 if e in threat_level:
                     d -= threat_level[e]
+                elif not e.can_atk():
+                    d -= 1
 
             move_list[(s,e)] = d
 
     move_list = OrderedDict(sorted(move_list.items(), key=lambda t:t[1]))
 
     #ITERATE THROUGH MOVES
-    move_table = {s:None for s in gmap.my_uships()}
+    move_table = {}
     first_targ = OrderedDict()
     unassigned = set(gmap.my_uships())
 
@@ -82,58 +84,65 @@ while True:
         move = None
         assigned = False
 
-        if s not in unassigned or len(unassigned) == 0:
+        if len(unassigned) == 0 or s not in unassigned:
             continue
 
         if s not in first_targ:
             first_targ[s] = e
 
+        #IF ITS A PLANET
         if type(e) == hlt.entity.Planet and rem_dock[e] > 0:
             assigned = True
             if s.can_dock(e):
                 nav_cmd = s.dock(e)
                 rem_dock[e] -= 1
             else:
-                nav_cmd, move = helper.nav(s,s.closest_pt_to(e), gmap, MAX_SPEED,move_table)
+                nav_cmd, move = helper.nav(s,s.closest_pt_to(e), gmap, None,move_table)
                 if nav_cmd:
                     rem_dock[e] -= 1
+
+        #IF ITS A SHIP
         elif type(e) == hlt.entity.Ship:
 
             if s.dist_to(e) <= WEAPON_RADIUS + 2*MAX_SPEED:
                 assigned = True
                 enemies = [t for t in gmap.en_uships() if s.dist_to(t) <= WEAPON_RADIUS + 2*MAX_SPEED]
-                friends = [t for t in gmap.my_ships() if e.dist_to(t) <= WEAPON_RADIUS + 2*MAX_SPEED]
+                friends = [t for t in gmap.my_uships() if e.dist_to(t) <= WEAPON_RADIUS + 2*MAX_SPEED]
+                friends.extend([t for t in gmap.my_dships() if e.dist_to(t) <= MAX_SPEED+WEAPON_RADIUS])
 
                 if len(enemies) >= len(friends):
                     dv = Point.polar(MAX_SPEED, s.angle_to(helper.cent_of_mass(enemies)))
                     pos = Position(s.loc - dv)
-                    nav_cmd, move = helper.nav(s,pos,gmap,MAX_SPEED,move_table)
-                elif len(friends) > len(enemies) and s in has_atked:
+                    nav_cmd, move = helper.nav(s,pos,gmap,None, move_table)
+                elif len(enemies) < len(friends) and s in has_atked:
                     pos = helper.cent_of_mass(friends)
-                    nav_cmd, move = helper.nav(s,pos,gmap,MAX_SPEED,move_table)
+                    nav_cmd, move = helper.nav(s,pos,gmap,None, move_table)
                 else:
-                    nav_cmd, move = helper.nav(s,s.closest_pt_to(e),gmap,MAX_SPEED,move_table)
+                    nav_cmd, move = helper.nav(s,s.closest_pt_to(e),gmap,None,move_table)
                     if nav_cmd:
-                        en_ship_assigned[e] -= 1
+                        en_ship_assigned[e].append(s)
 
-            elif en_ship_assigned[e] > 0:
+            elif len(en_ship_assigned[e]) < math.ceil(e.hp/WEAPON_DAMAGE):
                 assigned = True
-                nav_cmd, move = helper.nav(s,s.closest_pt_to(e),gmap,MAX_SPEED,move_table)
+                pos = s.closest_pt_to(e)
+                nav_cmd, move = helper.nav(s,pos,gmap,None,move_table)
                 if nav_cmd:
-                        en_ship_assigned[e] -= 1
+                    en_ship_assigned[e].append(s)
 
         if assigned:
             unassigned.remove(s)
         if nav_cmd:
             cmds.append(nav_cmd)
+        if move:
             move_table[s] = move
 
+    #IF IT WASN'T ASSIGNED
     for s in first_targ:
         if time.process_time() - start_time > 1.9:
             logging.info("TOOK WAY TOO MUCH TIME")
             break
         if s in unassigned:
-            nav_cmd, move = helper.nav(s,s.closest_pt_to(first_targ[s]),gmap, MAX_SPEED, move_table)
+            nav_cmd, move = helper.nav(s,s.closest_pt_to(first_targ[s]),gmap, None, move_table)
             if nav_cmd:
                 cmds.append(nav_cmd)
                 move_table[s] = move

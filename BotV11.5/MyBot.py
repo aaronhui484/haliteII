@@ -9,7 +9,7 @@ from hlt.constants import *
 from hlt.entity import Position
 
 # GAME START
-game = hlt.Game("Bot V11")
+game = hlt.Game("Bot V11.5")
 turn = 0
 
 while True:
@@ -44,6 +44,7 @@ while True:
             if min_turns < 1:
                 threat_level[e] = 1
 
+
     #OTHER INFO
     rem_dock = {p:p.rem_spots() for p in gmap.unowned_planets() + gmap.my_uplanets()}
     en_ship_assigned = {s:math.ceil(s.hp/WEAPON_DAMAGE) for s in gmap.en_ships()}
@@ -60,6 +61,8 @@ while True:
                 d = helper.to_turns(s.dist_to(e) - WEAPON_RADIUS)
                 if e in threat_level:
                     d -= threat_level[e]
+                elif not e.can_atk():
+                    d -= 1
 
             move_list[(s,e)] = d
 
