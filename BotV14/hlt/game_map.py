@@ -98,6 +98,9 @@ class Map:
     def all_uships(self):
         return [s for s in self.all_ships() if s.can_atk()]
 
+    def all_dships(self):
+        return [s for s in self.all_ships() if not s.can_atk()]
+
     def my_ships(self):
         return self.get_me().all_ships()
 

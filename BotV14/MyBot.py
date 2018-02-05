@@ -9,7 +9,7 @@ from hlt.constants import *
 from hlt.entity import Position
 
 # GAME START
-game = hlt.Game("Bot V13")
+game = hlt.Game("Bot V14")
 turn = 0
 
 while True:
@@ -82,7 +82,6 @@ while True:
 
         nav_cmd = None
         move = None
-        assigned = False
 
         if s not in unassigned or len(unassigned) == 0:
             continue
@@ -119,7 +118,6 @@ while True:
                 atk_ens = [t for t in gmap.en_uships() if t.dist_to(atk_pos) <= WEAPON_RADIUS + MAX_SPEED]
                 atk_frs = [t for t in gmap.my_uships() if t.dist_to(atk_pos) <= MAX_SPEED+2]
                 if len(atk_frs) > len(atk_ens):
-                    #logging.info("{} atk {}".format(s,e))
                     if nav_cmd:
                         en_ship_assigned[e] -= 1
                         cmds.append(nav_cmd)
@@ -139,7 +137,7 @@ while True:
                     break
                 
                 # HARASS
-                if en_dship != None and (my_dship == None or s.dist_to(en_dship)+7*(len(gmap.all_players()) - 1) < e.dist_to(my_dship)):
+                if en_dship != None and (my_dship == None or s.dist_to(en_dship)+7*(len(gmap.all_players()) - 1) < e.dist_to(my_dship)) and en_ship_assigned[en_dship] > 0:
                     chasers = [t for t in gmap.en_uships() if s.dist_to(t) <= 2*MAX_SPEED+WEAPON_RADIUS]
                     nav_cmd, move = helper.harass_nav(s,en_dship,gmap,None,move_table,enemies=chasers)
                     if nav_cmd:
@@ -147,7 +145,7 @@ while True:
                         if move:
                             move_table[s] = move
                         unassigned.discard(s)
-                        logging.info("{} harass {}".format(s,en_dship))
+                        #logging.info("{} harass {}".format(s,en_dship))
                         continue
 
                 if time.process_time() - start_time > 1.9:
@@ -156,7 +154,7 @@ while True:
                 
                 # DEFEND
                 if my_dship != None:
-                    def_frns = [t for t in gmap.my_uships() if t.dist_to(my_dship) <= MAX_SPEED + 2]
+                    def_frns = [t for t in gmap.my_uships() if t.dist_to(my_dship) <= MAX_SPEED + 3]
                     def_ens = [t for t in gmap.en_uships() if t.dist_to(my_dship) <= MAX_SPEED + WEAPON_RADIUS]
                     def_dfrns = [t for t in gmap.my_dships() if t.dist_to(my_dship) <= 3]
                     if e.dist_to(my_dship) <= WEAPON_RADIUS + MAX_SPEED and len(def_frns+def_dfrns) >= len(def_ens):
@@ -169,7 +167,7 @@ while True:
                         en_cent = helper.cent_of_mass(enemies)
                         if len(enemies) == 0:
                             logging.info("{} defend {}".format(s,e))
-                        d = WEAPON_RADIUS+len(gmap.all_players())-1 - (s.dist_to(enemies[0]) - MAX_SPEED)
+                        d = WEAPON_RADIUS+len(gmap.all_players())-2 - (s.dist_to(enemies[0]) - MAX_SPEED)
                         dv = Point.polar(d, s.angle_to(en_cent)) 
                         pos = Position(s.loc - dv)
                         nav_cmd, move = helper.nav(s,pos,gmap,None,move_table)
@@ -203,7 +201,7 @@ while True:
                 if time.process_time() - start_time > 1.9:
                     logging.info("TOOK WAY TOO MUCH TIME")
                     break
-                nav_cmd, move = helper.nav(s,s.closest_pt_to(e),gmap,None,move_table)
+                nav_cmd, move = helper.nav(s,e,gmap,None,move_table)
                 if nav_cmd:
                     en_ship_assigned[e] -= 1
                     cmds.append(nav_cmd)

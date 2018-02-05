@@ -22,6 +22,9 @@ class Point:
 	def __str__(self):
 		return "({},{})".format(round(self.x,2), round(self.y,2))
 
+	def __repr__(self):
+		return self.__str__()
+
 	def __eq__(self, other):
 		if other == None:
 			return False
@@ -29,6 +32,9 @@ class Point:
 
 	def __hash__(self):
 		return hash((self.x,self.y))
+
+	def mult(self, r):
+		return Point(r*self.x, r*self.y)
 
 	def norm2(self):
 		return self.x**2 + self.y**2
@@ -47,6 +53,8 @@ class Seg:
 	def __str__(self):
 		return str(self.p1) + " to " + str(self.p2)
 
+	def __repr__(self):
+		return self.__str__()
 	#Returns the displacement vector from p1 to p2
 	def d_vect(self):
 		return self.p2 - self.p1

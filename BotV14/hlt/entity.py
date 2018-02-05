@@ -320,9 +320,9 @@ class Position(Entity):
     :ivar owner: Unused.
     """
 
-    def __init__(self, loc):
+    def __init__(self, loc, radius = 0):
         self.loc = loc
-        self.radius = 0
+        self.radius = radius
         self.hp = None
         self.owner = None
         self.id = None

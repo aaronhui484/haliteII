@@ -1,1 +1,1 @@
-halite.exe -d "384 256" "python BotV12/MyBot.py" "python BotV11/MyBot.py" -s 1
+halite.exe -d "384 256" "python BotV14/MyBot.py" "python BotV13/MyBot.py" -s 3
